@@ -1,0 +1,29 @@
+# === Builder ===
+FROM rust:latest as builder
+
+WORKDIR /usr/src/app
+COPY . .
+
+# Build Agent
+RUN cargo build --release --bin port_sentinel_agent
+
+# === Runtime ===
+FROM debian:bookworm-slim
+
+# Install dependencies required for system monitoring/control
+# - docker.io: for docker CLI commands
+# - procps: for ps, free, etc.
+# - lsof: for file monitoring
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    procps \
+    lsof \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /usr/src/app/target/release/port_sentinel_agent .
+COPY --from=builder /usr/src/app/config.json .
+
+EXPOSE 3001
+
+CMD ["./port_sentinel_agent"]

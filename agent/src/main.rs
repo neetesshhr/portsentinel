@@ -21,6 +21,7 @@ use crate::system::monitor::get_system_stats;
 use crate::system::process::{scan_ports, kill_process};
 use crate::system::logs::{find_process_logs, tail_log_file};
 use crate::system::services::{get_service_status, start_service, stop_service, restart_service};
+use crate::system::docker::{list_containers, get_container_logs, control_container, ContainerInfo};
 use crate::config::AgentConfig;
 
 // === CLI ARGUMENTS ===
@@ -66,6 +67,10 @@ async fn main() {
         .route("/api/service/start/:name", post(service_start_api))
         .route("/api/service/stop/:name", post(service_stop_api))
         .route("/api/service/restart/:name", post(service_restart_api))
+        // === Docker API ===
+        .route("/api/docker/containers", get(docker_list_api))
+        .route("/api/docker/logs/:id", get(docker_logs_api))
+        .route("/api/docker/:action/:id", post(docker_control_api))
         .layer(cors)
         .layer(middleware::from_fn_with_state(shared_state.clone(), auth_middleware))
         .with_state(shared_state);
@@ -153,5 +158,25 @@ async fn service_restart_api(Path(name): Path<String>) -> Result<Json<String>, S
     match restart_service(&name) {
         Ok(msg) => Ok(Json(msg)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+// === DOCKER HANDLERS ===
+
+async fn docker_list_api() -> Json<Vec<ContainerInfo>> {
+    Json(list_containers())
+}
+
+async fn docker_logs_api(Path(id): Path<String>) -> Result<Json<Vec<String>>, StatusCode> {
+    match get_container_logs(&id) {
+        Ok(logs) => Ok(Json(logs)),
+        Err(_) => Err(StatusCode::BAD_REQUEST),
+    }
+}
+
+async fn docker_control_api(Path((action, id)): Path<(String, String)>) -> Result<Json<String>, StatusCode> {
+    match control_container(&id, &action) {
+        Ok(msg) => Ok(Json(msg)),
+        Err(_) => Err(StatusCode::BAD_REQUEST),
     }
 }

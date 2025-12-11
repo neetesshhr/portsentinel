@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortSentinel - Containers</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/assets/styles.css">
+
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-200 h-screen w-screen overflow-hidden flex flex-col font-sans">
+
+    <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-md z-10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3">
+                    <img src="/assets/logo.png" alt="PortSentinel Logo"
+                        class="w-8 h-8 rounded shadow-[0_0_10px_rgba(34,197,94,0.3)]">
+                    <h1 class="text-xl font-bold tracking-wider text-white">PORTSENTINEL <span
+                            class="text-gray-600 text-sm font-mono">v1.0</span></h1>
+                </div>
+                <nav class="flex gap-4">
+                    <a href="/"
+                        class="text-gray-300 hover:text-white text-sm font-semibold transition-colors">Dashboard</a>
+                    <a href="/view/services"
+                        class="text-gray-300 hover:text-white text-sm font-semibold transition-colors">Services</a>
+                    <a href="/view/containers"
+                        class="text-white text-sm font-bold border-b-2 border-green-500">Containers</a>
+                </nav>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <a href="/logout"
+                    class="text-xs text-red-400 border border-red-500/50 px-2 py-1 rounded hover:bg-red-500/10">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-auto p-4 max-w-7xl mx-auto w-full">
+        <!-- Containers List -->
+        <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 flex flex-col h-full">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-cyan-400">Docker Containers</h2>
+
+                <!-- Node Selector -->
+                <div class="flex items-center gap-2">
+                    <label for="node-select" class="text-xs font-bold text-gray-500 uppercase">Target Node:</label>
+                    <select id="node-select" name="node"
+                        class="bg-gray-900 border border-gray-600 text-white text-sm rounded px-3 py-1 focus:border-blue-500 outline-none"
+                        hx-get="/view/containers/list" hx-target="#containers-table" hx-trigger="change, load">
+                        {% for node in nodes %}
+                        <option value="{{ node.url }}" {% if node.url==current_node %}selected{% endif %}>
+                            {{ node.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-auto p-0">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-900/50 sticky top-0 z-10 backdrop-blur-sm">
+                        <tr>
+                            <th class="p-3 text-xs text-gray-500 font-medium border-b border-gray-700">ID</th>
+                            <th class="p-3 text-xs text-gray-500 font-medium border-b border-gray-700">NAMES</th>
+                            <th class="p-3 text-xs text-gray-500 font-medium border-b border-gray-700">IMAGE</th>
+                            <th class="p-3 text-xs text-gray-500 font-medium border-b border-gray-700">STATUS</th>
+                            <th class="p-3 text-xs text-gray-500 font-medium border-b border-gray-700 text-right">
+                                ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="containers-table">
+                        <!-- Loaded via HTMX -->
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-gray-500">Loading containers...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Logs Modal -->
+    <div id="log-modal"
+        class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">
+        <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-4xl h-3/4 flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white">Container Logs</h3>
+                <button onclick="document.getElementById('log-modal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-white">✕</button>
+            </div>
+            <pre id="log-content"
+                class="flex-1 bg-black p-4 overflow-y-auto text-green-400 font-mono text-xs whitespace-pre-wrap"></pre>
+        </div>
+    </div>
+
+    <script>
+        function showLogs(logs) {
+            document.getElementById('log-content').innerText = logs.join('\n');
+            document.getElementById('log-modal').classList.remove('hidden');
+        }
+    </script>
+</body>
+
+</html>

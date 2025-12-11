@@ -90,6 +90,11 @@ async fn main() {
         .route("/api/proxy/service/start", post(service_start_proxy))
         .route("/api/proxy/service/stop", post(service_stop_proxy))
         .route("/api/proxy/service/restart", post(service_restart_proxy))
+        // === Docker Manager Routes ===
+        .route("/view/containers", get(containers_page_handler))
+        .route("/view/containers/list", get(containers_list_proxy))
+        .route("/api/proxy/docker/logs/:id", get(docker_logs_proxy))
+        .route("/api/proxy/docker/:action/:id", post(docker_control_proxy))
         // We apply the layer ONLY to this router block
         // We use from_fn_with_state to inject the state into the middleware
         .layer(middleware::from_fn_with_state(shared_state.clone(), auth_middleware));

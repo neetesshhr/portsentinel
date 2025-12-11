@@ -1,0 +1,50 @@
+{% for c in containers %}
+<tr class="hover:bg-gray-700/50 transition-colors border-b border-gray-700/50">
+    <td class="p-3 font-mono text-xs text-blue-400">{{ c.id|truncate(12) }}</td>
+    <td class="p-3 text-sm font-bold text-gray-300">{{ c.names }}</td>
+    <td class="p-3 text-xs text-gray-500">{{ c.image }}</td>
+    <td class="p-3 text-xs">
+        <span class="px-2 py-0.5 rounded-full border 
+            {% if c.status.contains(" Up") %}bg-green-500/10 border-green-500/20 text-green-400 {% else %}bg-red-500/10
+            border-red-500/20 text-red-400{% endif %}">
+            {{ c.status }}
+        </span>
+    </td>
+    <td class="p-3 text-right space-x-2">
+        <button class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white"
+            hx-get="/api/proxy/docker/logs/{{ c.id }}" hx-vals='js:{node: document.getElementById("node-select").value}'
+            hx-target="#log-content" onclick="document.getElementById('log-modal').classList.remove('hidden')">
+            Logs
+        </button>
+        {% if c.status.contains("Up") %}
+        <button class="text-xs bg-red-900/50 hover:bg-red-800 border border-red-700 text-red-300 px-2 py-1 rounded"
+            hx-post="/api/proxy/docker/stop/{{ c.id }}"
+            hx-vals='js:{node: document.getElementById("node-select").value}' hx-swap="none"
+            onclick="setTimeout(()=>htmx.trigger('#node-select', 'change'), 1000)">
+            Stop
+        </button>
+        <button
+            class="text-xs bg-yellow-900/50 hover:bg-yellow-800 border border-yellow-700 text-yellow-300 px-2 py-1 rounded"
+            hx-post="/api/proxy/docker/restart/{{ c.id }}"
+            hx-vals='js:{node: document.getElementById("node-select").value}' hx-swap="none"
+            onclick="setTimeout(()=>htmx.trigger('#node-select', 'change'), 2000)">
+            Restart
+        </button>
+        {% else %}
+        <button
+            class="text-xs bg-green-900/50 hover:bg-green-800 border border-green-700 text-green-300 px-2 py-1 rounded"
+            hx-post="/api/proxy/docker/start/{{ c.id }}"
+            hx-vals='js:{node: document.getElementById("node-select").value}' hx-swap="none"
+            onclick="setTimeout(()=>htmx.trigger('#node-select', 'change'), 1000)">
+            Start
+        </button>
+        <button class="text-xs bg-gray-700 hover:bg-red-600 text-gray-400 hover:text-white px-2 py-1 rounded"
+            hx-post="/api/proxy/docker/rm/{{ c.id }}" hx-vals='js:{node: document.getElementById("node-select").value}'
+            hx-swap="none" onclick="setTimeout(()=>htmx.trigger('#node-select', 'change'), 1000)"
+            confirm="Delete container {{ c.names }}?">
+            Remove
+        </button>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}

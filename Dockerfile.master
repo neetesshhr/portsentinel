@@ -1,0 +1,23 @@
+# === Builder ===
+FROM rust:latest as builder
+
+WORKDIR /usr/src/app
+COPY . .
+
+# Build Master
+RUN cargo build --release --bin port_sentinel_master
+
+# === Runtime ===
+FROM debian:bookworm-slim
+
+WORKDIR /app
+COPY --from=builder /usr/src/app/target/release/port_sentinel_master .
+COPY --from=builder /usr/src/app/master/assets ./master/assets
+COPY --from=builder /usr/src/app/users.json .
+
+# Ensure assets folder structure matches expected logic
+RUN mkdir -p assets && cp -r master/assets/* assets/
+
+EXPOSE 7878
+
+CMD ["./port_sentinel_master"]

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile.master
+    ports:
+      - "7878:7878"
+    depends_on:
+      - agent
+    environment:
+      - RUST_LOG=info
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    ports:
+      - "3001:3001"
+    # === CRITICAL FOR SYSTEM MONITORING ===
+    # The agent needs to see host processes and control docker
+    privileged: true
+    network_mode: host  # Simplest way to see all network interfaces
+    pid: host           # See host processes
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Control Docker
+      # - /proc:/host/proc:ro # (Optional, if we updated code to read host proc)
+    environment:
+      - RUST_LOG=info

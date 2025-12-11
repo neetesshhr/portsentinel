@@ -5,7 +5,7 @@ use axum::{
     Json, Form,
 };
 use axum_extra::extract::cookie::{Cookie, PrivateCookieJar};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use askama::Template;
 use port_sentinel_shared::{SystemStats, ProcessInfo};
 use crate::state::{AppState, NodeConfig};
@@ -462,4 +462,93 @@ pub async fn service_restart_proxy(
 ) -> impl IntoResponse {
     let suffix = format!("restart/{}", params.name);
     proxy_service_command(&state, params.node, &suffix, reqwest::Method::POST).await
+}
+
+// === DOCKER MANAGER HANDLERS ===
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContainerInfo {
+    pub id: String,
+    pub image: String,
+    pub status: String,
+    pub names: String,
+    pub state: String,
+}
+
+#[derive(Template)]
+#[template(path = "containers.html")]
+struct ContainersTemplate {
+    nodes: Vec<NodeConfig>,
+    current_node: String,
+}
+
+#[derive(Template)]
+#[template(path = "containers_rows.html")]
+struct ContainersRowsTemplate {
+    containers: Vec<ContainerInfo>,
+}
+
+pub async fn containers_page_handler(
+    State(state): State<AppState>,
+    Query(params): Query<NodeParams>
+) -> impl IntoResponse {
+    let nodes_list = state.nodes.read().unwrap().clone();
+    let current_node = params.node.unwrap_or_else(|| {
+        nodes_list.first().map(|n| n.url.clone()).unwrap_or("http://127.0.0.1:3001".to_string())
+    });
+
+    ContainersTemplate {
+        nodes: nodes_list,
+        current_node,
+    }
+}
+
+pub async fn containers_list_proxy(
+    State(state): State<AppState>,
+    Query(params): Query<NodeParams>
+) -> impl IntoResponse {
+    let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
+    let token = get_token_for_url(&state, &node_url);
+    let client = build_client(token.as_ref());
+    
+    let url = format!("{}/api/docker/containers", node_url);
+    
+    let containers = match client.get(&url).send().await {
+        Ok(resp) => resp.json::<Vec<ContainerInfo>>().await.unwrap_or_default(),
+        Err(_) => vec![],
+    };
+
+    ContainersRowsTemplate { containers }
+}
+
+pub async fn docker_logs_proxy(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<NodeParams>
+) -> impl IntoResponse {
+    let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
+    let token = get_token_for_url(&state, &node_url);
+    let client = build_client(token.as_ref());
+    
+    let url = format!("{}/api/docker/logs/{}", node_url, id);
+    
+    match client.get(&url).send().await {
+        Ok(resp) => Json(resp.json::<Vec<String>>().await.unwrap_or_default()),
+        Err(_) => Json(vec!["Error fetching logs".to_string()]),
+    } 
+}
+
+pub async fn docker_control_proxy(
+    State(state): State<AppState>,
+    Path((action, id)): Path<(String, String)>,
+    Query(params): Query<NodeParams>
+) -> impl IntoResponse {
+    let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
+    let token = get_token_for_url(&state, &node_url);
+    let client = build_client(token.as_ref());
+    
+    let url = format!("{}/api/docker/{}/{}", node_url, action, id);
+    
+    let _ = client.post(&url).send().await;
+    "Action Sent"
 }
