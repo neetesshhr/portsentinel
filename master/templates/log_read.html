@@ -1,0 +1,18 @@
+<div hx-get="/logs/read?path={{ path }}&rate={{ rate }}&node={{ current_node }}" 
+     hx-trigger="every {{ rate }}s" 
+     hx-swap="outerHTML"
+     class="h-full flex flex-col">
+    
+    <div class="mb-2 pb-2 border-b border-gray-800 flex justify-between items-center text-gray-500 shrink-0">
+        <span class="truncate pr-4">Tailing: <span class="text-gray-300">{{ path }}</span></span>
+        <div class="flex items-center gap-3">
+             <span class="text-[10px] uppercase tracking-wider animate-pulse text-green-500">Live ({{ rate }}s)</span>
+             <button id="pause-btn" class="border border-gray-600 text-[10px] px-2 rounded hover:bg-gray-700">PAUSE</button>
+        </div>
+    </div>
+
+    <pre class="whitespace-pre-wrap break-all overflow-y-auto flex-1 custom-scrollbar">
+{% for line in lines %}{{ line }}
+{% endfor %}
+    </pre>
+</div>
