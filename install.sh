@@ -57,14 +57,29 @@ Description=PortSentinel Agent
 After=network.target
 
 [Service]
-ExecStart=$BIN_DIR/port_sentinel_agent
+ExecStart=$BIN_DIR/port_sentinel_agent 
 Restart=always
 User=root
 WorkingDirectory=$ASSETS_DIR
 
+
+
 [Install]
 WantedBy=multi-user.target
 EOF
+
+    # Create default config if missing
+    if [ ! -f "$ASSETS_DIR/config.json" ]; then
+        echo "creating default config.json"
+        cat <<CJ > "$ASSETS_DIR/config.json"
+{
+  "port": 3001,
+  "hostname": "localhost",
+  "auth_token": "change_me_please"
+}
+CJ
+        chmod 600 "$ASSETS_DIR/config.json"
+    fi
 
     systemctl daemon-reload
     systemctl enable --now port-sentinel-agent
