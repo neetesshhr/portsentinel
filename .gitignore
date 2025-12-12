@@ -4,3 +4,14 @@ config.json
 agent_config.json
 users.json
 myfiles/
+
+# Build artifacts
+dist/
+*.tar.gz
+
+# Database
+port_sentinel.db
+
+# Backups
+*.bak
+port_sentinel.db

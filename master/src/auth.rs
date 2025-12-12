@@ -5,10 +5,17 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 
 const USERS_FILE: &str = "users.json";
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+fn default_role() -> String { "admin".to_string() }
+// By default for migrated users, we don't force change unless we want to. Let's say false.
+fn default_must_change() -> bool { false }
+
+#[derive(Clone, Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct User {
     pub username: String,
     pub password_hash: String,
+    #[serde(default = "default_role")]
+    pub role: String,
+    #[serde(default = "default_must_change")]
     pub must_change_password: bool,
 }
 
@@ -36,6 +43,7 @@ impl AuthState {
         User {
             username: "admin".to_string(),
             password_hash: hash,
+            role: "admin".to_string(),
             must_change_password: true, // Forces change on first login
         }
     }
