@@ -37,11 +37,13 @@
 ### Option 1: The All-in-One Installer (Recommended)
 We provide a universal installer that can set up the Master Dashboard or just the Agent.
 
-1.  **Download** the latest release bundle (`port_sentinel_bundle_x86_64.tar.gz`) to your server.
+1.  **Download** the latest release bundle to your server:
+    *   **Intel/AMD (x86_64)**: `port_sentinel_bundle_x86_64.tar.gz`
+    *   **ARM64 (Raspberry Pi/AWS Graviton)**: `port_sentinel_bundle_aarch64.tar.gz`
 2.  **Extract and Run**:
     ```bash
-    tar -xzf port_sentinel_bundle_x86_64.tar.gz
-    cd dist
+    tar -xzf port_sentinel_bundle_x86_64.tar.gz  # or aarch64
+    cd dist # or dist_arm
     
     # To install Master Dashboard + Agent (Main Server):
     sudo ./install.sh --master
