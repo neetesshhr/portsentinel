@@ -116,4 +116,4 @@ We welcome contributions! Please see `CONTRIBUTING.md` for details on how to set
 
 ## 📄 License
 
-MIT © 2024 PortSentinel
+GPL v3 © 2024 PortSentinel
