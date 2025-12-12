@@ -4,7 +4,7 @@ use axum_extra::extract::cookie::Key;
 use axum::extract::FromRef;
 use crate::auth::AuthState;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct NodeConfig {
     pub id: String,
     pub name: String,
@@ -14,8 +14,7 @@ pub struct NodeConfig {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub nodes: Arc<RwLock<Vec<NodeConfig>>>,
-    pub auth: AuthState,
+    pub db: sqlx::SqlitePool,
     pub key: Key,
 }
 

@@ -19,8 +19,17 @@ PortSentinel is a centralized system monitoring and management tool written in R
 ## 🛠️ Getting Started
 
 ### Prerequisites
--   Rust (latest stable)
+-   Rust (latest stable) - *Only if building from source*
 -   Linux / macOS (for Agent)
+
+### 💻 System Requirements (Master Node)
+PortSentinel is extremely lightweight.
+| Resource | Minimum | Recommended (50+ Nodes) |
+| :--- | :--- | :--- |
+| **CPU** | 1 vCPU | 2 vCPU |
+| **RAM** | 512 MB | 2 GB |
+| **Disk** | 100 MB | 10 GB SSD |
+| **OS** | Any Linux (x86_64) | Ubuntu/Debian/Alpine |
 
 ### 1. Running the Agent (Target Node)
 The agent must run on the server you want to monitor.

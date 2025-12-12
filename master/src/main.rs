@@ -14,6 +14,7 @@ use axum_extra::extract::cookie::Key;
 mod auth;
 mod state;
 mod handlers;
+mod db;
 
 use crate::auth::AuthState;
 use crate::state::{AppState, NodeConfig};
@@ -62,13 +63,79 @@ async fn main() {
     println!("📂 Serving assets from: {}", assets_path);
 
     // --- Initialization ---
-    let auth_state = AuthState::load();
-    let initial_nodes = load_nodes_from_disk();
-    let key = Key::generate(); 
+    // Create database connection pool
+    // Ensure the file exists
+    if !std::path::Path::new("port_sentinel.db").exists() {
+        std::fs::File::create("port_sentinel.db").expect("Failed to create DB file");
+    }
+    
+    let db_pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .connect("sqlite:port_sentinel.db")
+        .await
+        .expect("Failed to connect to database");
 
+    // Initialize Schema
+    db::init_db(&db_pool).await.expect("Failed to initialize DB schema");
+
+    // --- Data Migration (JSON -> DB) ---
+    // If users table is empty, try to import from users.json
+    let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&db_pool)
+        .await
+        .unwrap_or(0);
+
+    if user_count == 0 && std::path::Path::new("users.json").exists() {
+        println!("📦 Migrating users.json to Database...");
+        let users_json = std::fs::read_to_string("users.json").unwrap_or_default();
+        if let Ok(users) = serde_json::from_str::<Vec<crate::auth::User>>(&users_json) {
+            for user in users {
+                let _ = db::create_user(&db_pool, &user).await;
+            }
+        }
+        let _ = std::fs::rename("users.json", "users.json.bak");
+    } else if user_count == 0 {
+        // Create default admin user if no JSON and no DB users
+        let hash = bcrypt::hash("admin", bcrypt::DEFAULT_COST).unwrap();
+        let admin = crate::auth::User {
+             username: "admin".to_string(), 
+             password_hash: hash,
+             role: "admin".to_string(),
+             must_change_password: true 
+        };
+        let _ = db::create_user(&db_pool, &admin).await;
+        println!("⚠️ No users found. Created default 'admin' user (password: admin)");
+    }
+
+    // If nodes table is empty, try to import from nodes.json
+    let node_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM nodes")
+        .fetch_one(&db_pool)
+        .await
+        .unwrap_or(0);
+
+    if node_count == 0 && std::path::Path::new("nodes.json").exists() {
+         println!("📦 Migrating nodes.json to Database...");
+         let nodes_json = std::fs::read_to_string("nodes.json").unwrap_or_default();
+         if let Ok(nodes) = serde_json::from_str::<Vec<crate::state::NodeConfig>>(&nodes_json) {
+             for node in nodes {
+                 let _ = db::upsert_node(&db_pool, &node).await;
+             }
+         }
+         let _ = std::fs::rename("nodes.json", "nodes.json.bak");
+    } else if node_count == 0 {
+        println!("✨ First run detected. Auto-registering Local Agent...");
+        let local_node = NodeConfig {
+            id: "local".to_string(),
+            name: "Local Server".to_string(),
+            url: "http://127.0.0.1:3001".to_string(),
+            token: None,
+        };
+        let _ = db::upsert_node(&db_pool, &local_node).await;
+    }
+
+    // Initialize State with DB Pool
+    let key = Key::generate(); 
     let shared_state = AppState {
-        nodes: Arc::new(RwLock::new(initial_nodes)),
-        auth: auth_state,
+        db: db_pool,
         key,
     };
 

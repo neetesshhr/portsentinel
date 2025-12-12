@@ -23,13 +23,8 @@ pub async fn auth_middleware(
 ) -> Response {
     if let Some(user_cookie) = jar.get("session_user") {
         let username = user_cookie.value();
-        // We use a read lock scope here to avoid holding it during the await
-        let user = {
-            let users = state.auth.users.read().unwrap();
-            users.iter().find(|u| u.username == username).cloned()
-        };
-
-        if let Some(user) = user {
+        // DB Call to get user
+        if let Some(user) = crate::db::get_user_by_username(&state.db, username).await {
             // Force password change logic
             if user.must_change_password {
                 let path = request.uri().path();
@@ -116,9 +111,12 @@ fn build_client(token: Option<&String>) -> reqwest::Client {
     reqwest::Client::builder().default_headers(headers).build().unwrap()
 }
 
-fn get_token_for_url(state: &AppState, url: &str) -> Option<String> {
-    let nodes = state.nodes.read().unwrap();
-    nodes.iter().find(|n| n.url == url).and_then(|n| n.token.clone())
+async fn get_token_for_url(state: &AppState, url: &str) -> Option<String> {
+    // DB Call to get nodes
+    if let Ok(nodes) = crate::db::get_all_nodes(&state.db).await {
+        return nodes.iter().find(|n| n.url == url).and_then(|n| n.token.clone());
+    }
+    None
 }
 
 async fn fetch_stats(base_url: &str, token: Option<&String>) -> Option<SystemStats> {
@@ -172,15 +170,17 @@ pub async fn login_submit(
     jar: PrivateCookieJar,
     Form(payload): Form<AuthPayload>
 ) -> impl IntoResponse {
-    if state.auth.verify_user(&payload.username, &payload.password).is_some() {
-        let cookie = Cookie::build(("session_user", payload.username))
-            .path("/")
-            .secure(false).http_only(true).build();
-        let updated_jar = jar.add(cookie);
-        (updated_jar, Redirect::to("/")).into_response()
-    } else {
-        LoginTemplate { error: Some("Invalid credentials".to_string()) }.into_response()
+    // Verify user against DB
+    if let Some(user) = crate::db::get_user_by_username(&state.db, &payload.username).await {
+        if bcrypt::verify(&payload.password, &user.password_hash).unwrap_or(false) {
+            let cookie = Cookie::build(("session_user", payload.username))
+                .path("/")
+                .secure(false).http_only(true).build();
+            let updated_jar = jar.add(cookie);
+            return (updated_jar, Redirect::to("/")).into_response();
+        }
     }
+    LoginTemplate { error: Some("Invalid credentials".to_string()) }.into_response()
 }
 
 pub async fn logout_handler(jar: PrivateCookieJar) -> impl IntoResponse {
@@ -199,7 +199,9 @@ pub async fn change_password_submit(
 ) -> impl IntoResponse {
     if let Some(cookie) = jar.get("session_user") {
         let username = cookie.value();
-        state.auth.update_password(username, &payload.password);
+        if let Ok(hash) = bcrypt::hash(&payload.password, bcrypt::DEFAULT_COST) {
+            let _ = crate::db::update_user_password(&state.db, username, &hash).await;
+        }
         return Redirect::to("/").into_response();
     }
     Redirect::to("/login").into_response()
@@ -207,10 +209,10 @@ pub async fn change_password_submit(
 
 pub async fn stats_handler(State(state): State<AppState>, Query(params): Query<NodeParams>) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     
     // Fetch fresh list of nodes for the sidebar
-    let nodes_list = state.nodes.read().unwrap().clone();
+    let nodes_list = crate::db::get_all_nodes(&state.db).await.unwrap_or_default();
     
     match fetch_stats(&node_url, token.as_ref()).await {
         Some(stats) => {
@@ -260,7 +262,7 @@ pub async fn stats_handler(State(state): State<AppState>, Query(params): Query<N
 
 pub async fn rows_handler(State(state): State<AppState>, Query(params): Query<NodeParams>) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     let processes = fetch_processes(&node_url, token.as_ref()).await.unwrap_or_default();
     let query = params.q.unwrap_or_default().to_lowercase();
     let rate_str = params.rate.unwrap_or("5".to_string());
@@ -273,49 +275,39 @@ pub async fn rows_handler(State(state): State<AppState>, Query(params): Query<No
 
 pub async fn kill_process_api(State(state): State<AppState>, Path(pid): Path<String>, Query(params): Query<NodeParams>) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     send_kill(&node_url, &pid, token.as_ref()).await;
     "Signal Sent"
 }
 
 pub async fn check_logs_handler(State(state): State<AppState>, Path(pid): Path<String>, Query(params): Query<NodeParams>) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     let files = fetch_log_files(&node_url, &pid, token.as_ref()).await;
     LogModalTemplate { pid, files, current_node: node_url }
 }
 
 pub async fn read_log_handler(State(state): State<AppState>, Query(params): Query<ReadParams>) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     let lines = fetch_log_lines(&node_url, &params.path, token.as_ref()).await;
     let rate = params.rate.unwrap_or("2".to_string());
     LogReadTemplate { path: params.path, lines, rate, current_node: node_url }
 }
 
 pub async fn save_node_handler(State(state): State<AppState>, Json(payload): Json<NodeForm>) -> impl IntoResponse {
-    let mut nodes = state.nodes.write().unwrap();
-    if let Some(existing) = nodes.iter_mut().find(|n| n.id == payload.id) {
-        existing.name = payload.name;
-        existing.url = payload.url;
-        existing.token = payload.token;
-    } else {
-        nodes.push(NodeConfig { id: payload.id, name: payload.name, url: payload.url, token: payload.token });
-    }
-    // We need to implement a public save method in main or move save_disk here
-    // For simplicity, let's duplicate the small save logic here or make it public in main
-    if let Ok(json) = serde_json::to_string_pretty(&*nodes) {
-        let _ = fs::write("nodes.json", json);
-    }
+    let node = NodeConfig {
+        id: payload.id,
+        name: payload.name,
+        url: payload.url,
+        token: payload.token,
+    };
+    let _ = crate::db::upsert_node(&state.db, &node).await;
     "Saved"
 }
 
 pub async fn delete_node_handler(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
-    let mut nodes = state.nodes.write().unwrap();
-    nodes.retain(|n| n.id != id);
-    if let Ok(json) = serde_json::to_string_pretty(&*nodes) {
-        let _ = fs::write("nodes.json", json);
-    }
+    let _ = crate::db::delete_node(&state.db, &id).await;
     "Deleted"
 }
 
@@ -324,7 +316,7 @@ pub async fn check_node_status(
     Query(params): Query<NodeParams>
 ) -> impl IntoResponse {
     let node_url = params.node.unwrap_or_default();
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
 
     // 1. Setup Client with a strict timeout
     // If the agent takes >2 seconds to respond, we consider it "Laggy" or Offline
@@ -394,7 +386,7 @@ pub async fn services_page_handler(
     State(state): State<AppState>,
     Query(params): Query<NodeParams>
 ) -> impl IntoResponse {
-    let nodes_list = state.nodes.read().unwrap().clone();
+    let nodes_list = crate::db::get_all_nodes(&state.db).await.unwrap_or_default();
     let current_node = params.node.unwrap_or_else(|| {
         nodes_list.first().map(|n| n.url.clone()).unwrap_or("http://127.0.0.1:3001".to_string())
     });
@@ -413,7 +405,7 @@ async fn proxy_service_command(
     method: reqwest::Method,
 ) -> String {
     let node_url = node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(state, &node_url);
+    let token = get_token_for_url(state, &node_url).await;
     let client = build_client(token.as_ref());
     
     let url = format!("{}/api/service/{}", node_url, path_suffix);
@@ -492,7 +484,7 @@ pub async fn containers_page_handler(
     State(state): State<AppState>,
     Query(params): Query<NodeParams>
 ) -> impl IntoResponse {
-    let nodes_list = state.nodes.read().unwrap().clone();
+    let nodes_list = crate::db::get_all_nodes(&state.db).await.unwrap_or_default();
     let current_node = params.node.unwrap_or_else(|| {
         nodes_list.first().map(|n| n.url.clone()).unwrap_or("http://127.0.0.1:3001".to_string())
     });
@@ -508,7 +500,7 @@ pub async fn containers_list_proxy(
     Query(params): Query<NodeParams>
 ) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     let client = build_client(token.as_ref());
     
     let url = format!("{}/api/docker/containers", node_url);
@@ -527,7 +519,7 @@ pub async fn docker_logs_proxy(
     Query(params): Query<NodeParams>
 ) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     let client = build_client(token.as_ref());
     
     let url = format!("{}/api/docker/logs/{}", node_url, id);
@@ -544,7 +536,7 @@ pub async fn docker_control_proxy(
     Query(params): Query<NodeParams>
 ) -> impl IntoResponse {
     let node_url = params.node.unwrap_or("http://127.0.0.1:3001".to_string());
-    let token = get_token_for_url(&state, &node_url);
+    let token = get_token_for_url(&state, &node_url).await;
     let client = build_client(token.as_ref());
     
     let url = format!("{}/api/docker/{}/{}", node_url, action, id);
