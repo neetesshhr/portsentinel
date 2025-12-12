@@ -33,6 +33,7 @@ else
         INSTALL_AGENT=true
     else
         INSTALL_AGENT=true
+        read -p "Enter Agent Authentication Token: " AGENT_TOKEN
     fi
 fi
 
@@ -75,7 +76,7 @@ EOF
 {
   "port": 3001,
   "hostname": "localhost",
-  "auth_token": "change_me_please"
+  "auth_token": "${AGENT_TOKEN:-change_me_please}"
 }
 CJ
         chmod 600 "$ASSETS_DIR/config.json"
