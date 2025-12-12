@@ -4,7 +4,7 @@
 ### The Lightweight, Self-Hosted Infrastructure Monitor
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)
+![License](https://img.shields.io/badge/license-GPL-green.svg?style=flat-square)
 ![Rust](https://img.shields.io/badge/built_with-Rust-orange.svg?style=flat-square)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg?style=flat-square)
 
