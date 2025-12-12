@@ -81,12 +81,23 @@ window.switchNode = function(url) {
 
 // === 5. NODE MANAGEMENT (MODAL) ===
 
+// Helper to generate UUIDs (fallback for non-secure contexts)
+function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 // Expose these to window so HTML onclick="..." can find them
 window.openNodeModal = function(id = null, name = '', url = '', token = '') {
     const modal = document.getElementById('node-modal');
     const title = document.getElementById('node-modal-title');
     
-    document.getElementById('node-id').value = id || crypto.randomUUID();
+    document.getElementById('node-id').value = id || generateUUID();
     document.getElementById('node-name').value = name;
     document.getElementById('node-url').value = url;
     document.getElementById('node-token').value = token;
