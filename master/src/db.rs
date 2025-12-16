@@ -49,6 +49,18 @@ pub async fn update_user_password(pool: &SqlitePool, username: &str, password_ha
     Ok(())
 }
 
+pub async fn update_user_credentials(pool: &SqlitePool, old_username: &str, new_username: &str, password_hash: &str) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE users SET username = ?, password_hash = ?, must_change_password = 0 WHERE username = ?"
+    )
+    .bind(new_username)
+    .bind(password_hash)
+    .bind(old_username)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn get_all_users(pool: &SqlitePool) -> Result<Vec<User>, sqlx::Error> {
     sqlx::query_as::<_, User>("SELECT username, password_hash, role, must_change_password FROM users")
         .fetch_all(pool)

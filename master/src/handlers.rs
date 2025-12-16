@@ -46,7 +46,9 @@ struct LoginTemplate { error: Option<String> }
 
 #[derive(Template)]
 #[template(path = "change_password.html")]
-struct ChangePwTemplate;
+struct ChangePwTemplate {
+    username: String,
+}
 
 #[derive(Template)]
 #[template(path = "stats.html")]
@@ -88,7 +90,10 @@ struct LogReadTemplate {
 pub struct AuthPayload { username: String, password: String }
 
 #[derive(Deserialize)]
-pub struct PwPayload { password: String }
+pub struct PwPayload { 
+    username: String,
+    password: String 
+}
 
 #[derive(Deserialize)]
 pub struct NodeParams { node: Option<String>, q: Option<String>, rate: Option<String> }
@@ -188,8 +193,13 @@ pub async fn logout_handler(jar: PrivateCookieJar) -> impl IntoResponse {
     (updated_jar, Redirect::to("/login"))
 }
 
-pub async fn change_password_page() -> impl IntoResponse {
-    ChangePwTemplate
+pub async fn change_password_page(jar: PrivateCookieJar) -> impl IntoResponse {
+    let username = if let Some(cookie) = jar.get("session_user") {
+        cookie.value().to_string()
+    } else {
+        "".to_string()
+    };
+    ChangePwTemplate { username }
 }
 
 pub async fn change_password_submit(
@@ -198,9 +208,18 @@ pub async fn change_password_submit(
     Form(payload): Form<PwPayload>
 ) -> impl IntoResponse {
     if let Some(cookie) = jar.get("session_user") {
-        let username = cookie.value();
+        let current_username = cookie.value();
         if let Ok(hash) = bcrypt::hash(&payload.password, bcrypt::DEFAULT_COST) {
-            let _ = crate::db::update_user_password(&state.db, username, &hash).await;
+            // Update both username and password
+            let _ = crate::db::update_user_credentials(&state.db, current_username, &payload.username, &hash).await;
+            
+            // If username changed, we MUST update the cookie
+            let new_cookie = Cookie::build(("session_user", payload.username))
+                .path("/")
+                .secure(false).http_only(true).build();
+            let updated_jar = jar.add(new_cookie);
+            
+            return (updated_jar, Redirect::to("/")).into_response();
         }
         return Redirect::to("/").into_response();
     }
