@@ -78,4 +78,4 @@ We are committed to providing a friendly, safe, and welcoming environment for al
 ## 🤝 Need Help?
 If you have questions, feel free to reach out in the Discussions tab .
 
-Thank you for helping us build the fastest monitoring tool on the planet! 🚀
+Thank you for helping us build the fastest monitoring tool on the planet! 🚀🚀
