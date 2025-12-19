@@ -114,7 +114,27 @@ The application uses `config.json` (if present) or Environment Variables.
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see `CONTRIBUTING.md` for details on how to set up the development environment.
+We love contributions! whether it's a bug fix, new feature, or just correcting a typo.
+
+Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+### Quick Start for Contributors
+
+1.  **Fork** the repo on GitHub.
+2.  **Clone** the project to your own machine.
+3.  **Commit** changes to your own branch.
+4.  **Push** your work back up to your fork.
+5.  Submit a **Pull Request** so we can review your changes!
+
+---
+
+## ❤️ Support Us
+
+PortSentinel is an open-source project maintained by the community. Your support helps us keep the lights on and the code shipping.
+
+**[Become a Backer on Open Collective](https://opencollective.com/portsentinel)**
+
+Special thanks to all our backers and contributors!
 
 ## 📄 License
 
