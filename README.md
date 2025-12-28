@@ -43,7 +43,6 @@ We provide a universal installer that can set up the Master Dashboard or just th
 2.  **Extract and Run**:
     ```bash
     tar -xzf port_sentinel_bundle_x86_64.tar.gz  # or aarch64
-    cd dist # or dist_arm
     
     # To install Master Dashboard + Agent (Main Server):
     sudo ./install.sh --master
@@ -51,8 +50,19 @@ We provide a universal installer that can set up the Master Dashboard or just th
     # To install Agent Only (Remote Nodes):
     sudo ./install.sh --agent
     ```
-3.  **Access**: Open `http://<YOUR_IP>:7878`. The local agent is automatically registered!
-
+    ### After you install master
+    make sure to change the password default is `admin` and `admin`
+    when you get to dashboard be sure to edit the password for local to `change_me_please`  **--This is a bug will be fixed soon also this is default password for agents also--**
+    but if you want to update agent password in `/var/lib/port_sentinel/config.json`
+    ```json
+      {
+      "port": 3001,
+      "hostname": "localhost",
+      "auth_token": "change_me_please"
+     }
+    ```
+4.  **Access**: Open `http://<YOUR_IP>:7878`. The local agent is automatically registered!
+## Comming soon docker
 ### Option 2: Docker
 Prefer containers? We've got you covered.
 
